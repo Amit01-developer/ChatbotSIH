@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sikkim Monastery Chatbot</title>
+  <style>
+    :root{--accent:#355c7d;--bg:#f6f9fb}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:var(--bg);margin:0;padding:20px;display:flex;justify-content:center}
+    .container{width:100%;max-width:900px;background:white;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.08);overflow:hidden}
+    header{padding:18px 22px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:16px}
+    header img.logo{width:56px;height:56px;border-radius:8px;object-fit:cover}
+    header h1{font-size:18px;margin:0}
+    main{display:flex;gap:20px;padding:20px}
+    .left{width:360px;min-width:260px}
+    .kb{background:#fafafa;padding:14px;border-radius:8px;border:1px solid #f0f0f0}
+    .kb h3{margin:0 0 8px 0;font-size:15px}
+    .kb p{margin:0;font-size:14px;color:#333}
+    .monastery-img{margin-top:12px;border-radius:6px;overflow:hidden}
+    .monastery-img img{width:100%;display:block}
+    .chat{flex:1;display:flex;flex-direction:column;height:420px}
+    .messages{flex:1;padding:14px;overflow:auto;display:flex;flex-direction:column;gap:10px}
+    .msg{max-width:78% padding:8px}
+    .user{align-self:flex-end;background:var(--accent);color:white;padding:10px 12px;border-radius:12px 12px 6px 12px}
+    .bot{align-self:flex-start;background:#f1f5f9;color:#0b2545;padding:10px 12px;border-radius:12px 12px 12px 6px}
+    .controls{display:flex;gap:8px;padding:12px;border-top:1px solid #eee}
+    .controls input[type="text"]{flex:1;padding:10px;border:1px solid #ddd;border-radius:8px}
+    .controls button{background:var(--accent);color:white;border:none;padding:10px 12px;border-radius:8px;cursor:pointer}
+    .lang{width:120px;padding:8px;border-radius:8px;border:1px solid #ddd}
+    footer{padding:12px 18px;border-top:1px solid #eee;font-size:12px;color:#666}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <img class="logo" src="monastery.png" alt="monastery">
+      <div>
+        <h1>Sikkim Monastery Chatbot</h1>
+        <div style="color:#666;font-size:13px">Ask about the digitization project — English / Hindi</div>
+      </div>
+    </header>
+
+    <main>
+      <div class="left">
+        <div class="kb">
+          <h3>Project Title</h3>
+          <p id="kb-title">Loading…</p>
+          <div class="monastery-img">
+            <img src="monastery.png" alt="problem statement image">
+          </div>
+        </div>
+      </div>
+
+      <div class="chat">
+        <div class="messages" id="messages">
+          <div class="bot">Hello! Ask me about the project features, map, audio guides, or archives. (Choose language.)</div>
+        </div>
+
+        <div class="controls">
+          <select id="lang" class="lang">
+            <option value="en">English</option>
+            <option value="hi">हिन्दी</option>
+          </select>
+          <input id="input" type="text" placeholder="Type your question..." />
+          <button id="send">Send</button>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      Data source: problem statement image. This demo uses a local Flask backend with a simple rule-based knowledge base.
+    </footer>
+  </div>
+
+  <script>
+    // Load KB title from server when page loads
+    async function fetchKBTitle(){
+      try{
+        const res = await fetch('/static/kb.json');
+        const kb = await res.json();
+        const sel = document.getElementById('lang');
+        document.getElementById('kb-title').innerText = kb.title[sel.value] || kb.title.en;
+      }catch(e){
+        document.getElementById('kb-title').innerText = "Digitize and Showcase Monasteries of Sikkim for Tourism and Cultural Preservation";
+      }
+    }
+
+    fetchKBTitle();
+
+    const messagesEl = document.getElementById('messages');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const langEl = document.getElementById('lang');
+
+    function appendMessage(text, who){
+      const div = document.createElement('div');
+      div.className = who === 'user' ? 'user' : 'bot';
+      div.innerText = text;
+      const wrapper = document.createElement('div');
+      wrapper.appendChild(div);
+      messagesEl.appendChild(wrapper);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    async function send(){
+      const message = inputEl.value.trim();
+      if(!message) return;
+      const lang = langEl.value;
+      appendMessage(message, 'user');
+      inputEl.value = '';
+      appendMessage('Typing...', 'bot');
+
+      try{
+        const res = await fetch('/chat', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({message, lang})
+        });
+        const data = await res.json();
+        // remove last 'Typing...' bot message
+        const children = messagesEl.children;
+        if(children.length) messagesEl.removeChild(children[children.length-1]);
+        appendMessage(data.reply, 'bot');
+      }catch(err){
+        // remove last 'Typing...' bot message
+        const children = messagesEl.children;
+        if(children.length) messagesEl.removeChild(children[children.length-1]);
+        appendMessage('Error: could not contact server.', 'bot');
+      }
+    }
+
+    sendBtn.addEventListener('click', send);
+    inputEl.addEventListener('keydown', e => { if(e.key === 'Enter') send(); });
+    langEl.addEventListener('change', fetchKBTitle);
+  </script>
+</body>
+</html>
